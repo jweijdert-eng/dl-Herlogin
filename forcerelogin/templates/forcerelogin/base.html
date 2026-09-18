@@ -1,0 +1,18 @@
+{% extends 'allianceauth/base-bs5.html' %}
+
+{% load i18n %}
+{% load static %}
+
+{% block page_title %}{% translate "Herlogin" %}{% endblock %}
+
+{% block header_nav_brand %}{% translate "Herlogin" %}{% endblock header_nav_brand %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'forcerelogin/forcerelogin.css' %}?v={{ versie }}">
+{% endblock extra_css %}
+
+{% block content %}
+    <div class="fr-app">
+        {% block details %}{% endblock %}
+    </div>
+{% endblock %}

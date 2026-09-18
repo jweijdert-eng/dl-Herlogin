@@ -1,0 +1,229 @@
+{% extends 'forcerelogin/base.html' %}
+
+{% load i18n %}
+
+{% block details %}
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <h2 class="mb-0">🔐 {% translate "Herlogin" %}</h2>
+    </div>
+
+    <div class="fr-tiles mb-3">
+        <div class="fr-tile fr-tile-accounts">
+            <div class="fr-tile-n">{{ n_accounts }}</div>
+            <div class="fr-tile-l">{% translate "accounts" %}</div>
+        </div>
+        <div class="fr-tile {% if n_pending %}fr-tile-open{% else %}fr-tile-klaar{% endif %}">
+            <div class="fr-tile-n">{{ n_pending }}</div>
+            <div class="fr-tile-l">{% translate "wachten op herlogin" %}</div>
+        </div>
+        <div class="fr-tile fr-tile-done">
+            <div class="fr-tile-n">{{ n_fulfilled }}</div>
+            <div class="fr-tile-l">{% translate "voldaan (30 dagen)" %}</div>
+        </div>
+    </div>
+
+    <form method="get" class="d-flex gap-2 flex-wrap mb-3 align-items-center">
+        {% for f in scopes %}
+            <a href="?scope={{ f.key }}{% if corp_id %}&amp;corp={{ corp_id }}{% endif %}{% if q %}&amp;q={{ q|urlencode }}{% endif %}"
+               class="btn btn-sm {% if scope == f.key %}btn-{{ f.color }}{% else %}btn-outline-{{ f.color }}{% endif %}">
+                {{ f.label }}
+            </a>
+        {% endfor %}
+        <input type="hidden" name="scope" value="{{ scope }}">
+        <select name="corp" class="form-select form-select-sm fr-input fr-corp" onchange="this.form.submit()" aria-label="{% translate 'Corporatie' %}">
+            <option value="">{% translate "Alle corporaties" %}</option>
+            {% for id, name in corps %}
+                <option value="{{ id }}" {% if corp_id == id %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        </select>
+        <span class="fr-zoek">
+            <input type="search" name="q" value="{{ q }}" class="form-control form-control-sm fr-input"
+                   placeholder="{% translate 'Zoek op naam, alt of corp…' %}" aria-label="{% translate 'Zoeken' %}">
+            <button type="submit" class="btn btn-sm fr-btn">{% translate "Zoek" %}</button>
+            {% if q %}
+                <a class="btn btn-sm fr-btn" href="?scope={{ scope }}{% if corp_id %}&amp;corp={{ corp_id }}{% endif %}" title="{% translate 'Zoekopdracht wissen' %}">✕</a>
+            {% endif %}
+        </span>
+        <span class="ms-auto small text-muted">
+            {{ rows|length }} {% translate "account(s)" %}{% if q %} {% translate "voor" %} “{{ q }}”{% endif %}
+        </span>
+    </form>
+
+    {% if not rows %}
+        <div class="alert alert-secondary">
+            {% if q %}
+                {% blocktranslate %}Niets gevonden voor “{{ q }}”.{% endblocktranslate %}
+            {% elif scope == 'pending' %}
+                ✅ {% translate "Niemand hoeft op dit moment opnieuw in te loggen." %}
+            {% else %}
+                {% translate "Geen accounts met een main character." %}
+            {% endif %}
+        </div>
+    {% else %}
+        <form method="post" action="{% url 'forcerelogin:bulk' %}" id="fr-bulk" class="fr-bulk mb-2">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <input type="hidden" name="scope" value="{{ scope }}">
+            <input type="hidden" name="q" value="{{ q }}">
+            <input type="hidden" name="corp" value="{{ corp_id|default_if_none:'' }}">
+            <input type="text" name="reason" maxlength="200" class="form-control form-control-sm fr-input fr-bulk-reden"
+                   placeholder="{% translate 'Reden voor de bulk (optioneel)' %}" aria-label="{% translate 'Reden' %}">
+            <label class="fr-alts-vlag" title="{% translate 'Ook elke alt moet daarna één keer via EVE SSO' %}">
+                <input type="checkbox" class="form-check-input" name="alts" value="1" checked> {% translate "incl. alts" %}
+            </label>
+            <button type="submit" name="mode" value="selected" class="btn btn-sm btn-warning fr-nowrap"
+                    onclick="return document.querySelectorAll('input[name=user_id]:checked').length > 0 || (alert('{% translate "Vink eerst leden aan." %}'), false)">
+                ☑ {% translate "Forceer geselecteerde" %}
+            </button>
+            <button type="submit" name="mode" value="shown" class="btn btn-sm btn-outline-danger fr-nowrap" {% if not n_forceable %}disabled{% endif %}
+                    onclick="return confirm('{% if corp_name %}{% translate "Hele corp" %} {{ corp_name|escapejs }}{% else %}{% translate "Alle getoonde accounts" %}{% endif %} ({{ n_forceable }}) {% translate "opnieuw laten inloggen?" %}')">
+                {% if corp_name %}⚠ {% translate "Forceer hele corp" %} {{ corp_name }} ({{ n_forceable }}){% else %}⚠ {% translate "Forceer alle getoonde" %} ({{ n_forceable }}){% endif %}
+            </button>
+            <span class="small text-muted">{% translate "admins en open verzoeken worden overgeslagen" %}</span>
+        </form>
+
+        <div class="card mb-4">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 fr-table">
+                    <thead>
+                        <tr>
+                            <th class="fr-vink">
+                                <input type="checkbox" class="form-check-input" aria-label="{% translate 'Alles aanvinken' %}"
+                                       onclick="document.querySelectorAll('input[name=user_id]').forEach(c => c.checked = this.checked)">
+                            </th>
+                            <th>{% translate "Lid" %}</th>
+                            <th>{% translate "Corporatie" %}</th>
+                            <th>{% translate "State" %}</th>
+                            <th>{% translate "Laatste login" %}</th>
+                            <th>{% translate "Herlogin" %}</th>
+                            <th class="text-end">{% translate "Actie" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in rows %}
+                            <tr class="{% if r.pending %}fr-row-open{% endif %}">
+                                <td class="fr-vink">
+                                    {% if not r.pending and not r.is_admin %}
+                                        <input type="checkbox" class="form-check-input" name="user_id" value="{{ r.user_id }}" form="fr-bulk"
+                                               aria-label="{{ r.main_name }}">
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <img class="fr-portrait" src="https://images.evetech.net/characters/{{ r.character_id }}/portrait?size=32" alt="" loading="lazy">
+                                        <div>
+                                            <div class="fw-semibold">{{ r.main_name }}{% if r.is_admin %} <span class="badge fr-badge-admin" title="{% translate 'Wordt bij bulk overgeslagen' %}">admin</span>{% endif %}</div>
+                                            <div class="small text-muted">{{ r.username }}{% if r.n_chars > 1 %} · {{ r.n_chars }} characters{% endif %}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div>{{ r.corp_name|default:"–" }}</div>
+                                    {% if r.alliance_name %}<div class="small text-muted">{{ r.alliance_name }}</div>{% endif %}
+                                </td>
+                                <td>
+                                    {% if r.state %}
+                                        <span class="badge fr-state fr-state-{{ r.state|lower }}">{{ r.state }}</span>
+                                    {% else %}–{% endif %}
+                                </td>
+                                <td class="fr-nowrap">
+                                    {% if r.last_login %}
+                                        <span title="{{ r.last_login|date:'d-m-Y H:i' }}">{{ r.last_login|timesince }} {% translate "geleden" %}</span>
+                                    {% else %}
+                                        <span class="text-muted">{% translate "nooit" %}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if r.pending %}
+                                        {% if r.pending.status == 'alts' %}
+                                            <span class="badge fr-badge-alts" title="{% translate 'Main is ingelogd; alts nog niet allemaal' %}">👥 {% translate "alts" %} {{ r.alts_done }}/{{ r.alts_total }}</span>
+                                        {% else %}
+                                            <span class="badge fr-badge-open">⏳ {% translate "wacht" %}</span>
+                                            {% if r.pending.include_alts %}<span class="badge fr-badge-alts">+ {% translate "alts" %}</span>{% endif %}
+                                        {% endif %}
+                                        <div class="small text-muted">
+                                            {{ r.pending.requested_at|timesince }} {% translate "geleden" %}
+                                            {% if r.pending.requested_by %}· {{ r.pending.requested_by.profile.main_character.character_name|default:r.pending.requested_by.username }}{% endif %}
+                                            {% if r.pending.reason %}· “{{ r.pending.reason }}”{% endif %}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">–</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if r.pending %}
+                                        <form method="post" action="{% url 'forcerelogin:cancel' r.user_id %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">{% translate "Intrekken" %}</button>
+                                        </form>
+                                    {% else %}
+                                        <form method="post" action="{% url 'forcerelogin:force' r.user_id %}" class="fr-force">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <input type="text" name="reason" maxlength="200" class="form-control form-control-sm fr-input"
+                                                   placeholder="{% translate 'Reden (optioneel)' %}" aria-label="{% translate 'Reden' %}">
+                                            <label class="fr-alts-vlag" title="{% translate 'Ook elke alt moet daarna één keer via EVE SSO' %}">
+                                                <input type="checkbox" class="form-check-input" name="alts" value="1" checked> {% translate "alts" %}
+                                            </label>
+                                            <button type="submit" class="btn btn-sm btn-warning fr-nowrap">{% translate "Forceer herlogin" %}</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <span>📜 {% translate "Geschiedenis" %}</span>
+            <span class="small text-muted">{% translate "laatste" %} {{ history|length }}</span>
+        </div>
+        {% if not history %}
+            <div class="card-body text-muted">{% translate "Nog geen herlogin-verzoeken." %}</div>
+        {% else %}
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 fr-table">
+                    <thead>
+                        <tr>
+                            <th>{% translate "Wanneer" %}</th>
+                            <th>{% translate "Lid" %}</th>
+                            <th>{% translate "Door" %}</th>
+                            <th>{% translate "Reden" %}</th>
+                            <th>{% translate "Status" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in history %}
+                            <tr>
+                                <td class="fr-nowrap" title="{{ h.requested_at|timesince }} {% translate 'geleden' %}">{{ h.requested_at|date:"d-m-Y H:i" }}</td>
+                                <td>{{ h.user.profile.main_character.character_name|default:h.user.username }}</td>
+                                <td>{% if h.requested_by %}{{ h.requested_by.profile.main_character.character_name|default:h.requested_by.username }}{% else %}–{% endif %}</td>
+                                <td>{{ h.reason|default:"–" }}</td>
+                                <td class="fr-nowrap">
+                                    {% if h.status == 'pending' %}
+                                        <span class="badge fr-badge-open">⏳ {% translate "wacht" %}</span>
+                                        {% if h.include_alts %}<span class="badge fr-badge-alts">+ {% translate "alts" %}</span>{% endif %}
+                                    {% elif h.status == 'alts' %}
+                                        <span class="badge fr-badge-alts">👥 {% translate "alts open" %}</span>
+                                        <span class="small text-muted">{% translate "main" %} {{ h.fulfilled_at|date:"d-m-Y H:i" }}</span>
+                                    {% elif h.status == 'fulfilled' %}
+                                        <span class="badge fr-badge-done">✓ {% translate "voldaan" %}{% if h.include_alts %} + {% translate "alts" %}{% endif %}</span>
+                                        <span class="small text-muted">{{ h.completed_at|date:"d-m-Y H:i" }}</span>
+                                    {% else %}
+                                        <span class="badge fr-badge-cancel">✕ {% translate "ingetrokken" %}</span>
+                                        <span class="small text-muted">{{ h.cancelled_at|date:"d-m-Y H:i" }}{% if h.cancelled_by %} · {{ h.cancelled_by.profile.main_character.character_name|default:h.cancelled_by.username }}{% endif %}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

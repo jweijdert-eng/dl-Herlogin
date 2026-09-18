@@ -1,0 +1,66 @@
+{% extends 'forcerelogin/base.html' %}
+
+{% load i18n %}
+
+{% block page_title %}{% translate "Alts opnieuw inloggen" %}{% endblock %}
+
+{% block details %}
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            <div class="card fr-alts">
+                <div class="card-header">
+                    <h4 class="mb-0">👥 {% translate "Log je alts opnieuw in" %}</h4>
+                </div>
+                <div class="card-body">
+                    <p class="mb-1">
+                        {% translate "Een beheerder heeft gevraagd dat je account opnieuw inlogt, inclusief al je alts." %}
+                        {% if verzoek.reason %}<br><span class="text-muted">{% translate "Reden" %}: “{{ verzoek.reason }}”</span>{% endif %}
+                    </p>
+                    <p class="text-muted small mb-3">
+                        {% translate "Klik op de knop en kies op de EVE-pagina telkens een alt die hieronder nog open staat. Tot alles geweest is kun je Auth verder niet gebruiken." %}
+                    </p>
+
+                    <div class="fr-alts-voortgang mb-3">
+                        <div class="progress fr-progress" role="progressbar" aria-valuenow="{{ klaar }}" aria-valuemin="0" aria-valuemax="{{ totaal }}">
+                            <div class="progress-bar bg-success" style="width: {% widthratio klaar totaal 100 %}%"></div>
+                        </div>
+                        <span class="fr-nowrap">{{ klaar }} / {{ totaal }} {% translate "alts klaar" %}</span>
+                    </div>
+
+                    <ul class="list-unstyled fr-alts-lijst mb-3">
+                        {% if main %}
+                            <li class="fr-alt fr-alt-klaar">
+                                <img class="fr-portrait" src="https://images.evetech.net/characters/{{ main.character_id }}/portrait?size=32" alt="">
+                                <span class="fr-alt-naam">{{ main.character_name }} <span class="badge fr-badge-admin">main</span></span>
+                                <span class="badge fr-badge-done">✓ {% translate "ingelogd" %}</span>
+                            </li>
+                        {% endif %}
+                        {% for char, ok in rijen %}
+                            <li class="fr-alt {% if ok %}fr-alt-klaar{% endif %}">
+                                <img class="fr-portrait" src="https://images.evetech.net/characters/{{ char.character_id }}/portrait?size=32" alt="">
+                                <span class="fr-alt-naam">{{ char.character_name }} <span class="small text-muted">{{ char.corporation_name }}</span></span>
+                                {% if ok %}
+                                    <span class="badge fr-badge-done">✓ {% translate "klaar" %}</span>
+                                {% else %}
+                                    <span class="badge fr-badge-open">⏳ {% translate "nog inloggen" %}</span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+
+                    <a href="{% url 'forcerelogin:alt_login' %}" class="btn btn-warning fr-nowrap">
+                        <i class="fas fa-sign-in-alt fa-fw"></i> {% translate "Log een alt in via EVE SSO" %}
+                    </a>
+                    <form method="post" action="{% url 'logout' %}" class="d-inline ms-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-secondary">{% translate "Uitloggen" %}</button>
+                    </form>
+
+                    <p class="small text-muted mt-3 mb-0">
+                        {% translate "Kun je een van deze characters niet meer inloggen? Meld dat bij een beheerder; die kan het verzoek intrekken." %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

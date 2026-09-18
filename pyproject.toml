@@ -1,0 +1,44 @@
+[build-system]
+build-backend = "hatchling.build"
+requires = [
+    "hatchling",
+]
+
+[project]
+name = "aa-forcerelogin"
+description = "Herlogin-plugin voor Alliance Auth — dwing een lid om opnieuw in te loggen (per account, met geschiedenis)."
+readme = "README.md"
+keywords = [
+    "allianceauth",
+    "session",
+    "security",
+]
+license = { file = "LICENSE" }
+authors = [
+    { name = "Dutch Legions" },
+]
+requires-python = ">=3.10,<3.15"
+classifiers = [
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 5.2",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+]
+dynamic = [
+    "version",
+]
+dependencies = [
+    "allianceauth>=5",
+]
+
+[tool.hatch]
+version.path = "forcerelogin/__init__.py"
+build.include = [
+    "/forcerelogin",
+]

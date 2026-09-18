@@ -1,0 +1,208 @@
+/* Herlogin — zelfde huisstijl als Link Check / Character Scan.
+   Alles gescoped onder .fr-app zodat we niets van AA of een ander thema raken.
+   Bewust géén var(--bs-tertiary-bg): die is in het donkere AA-thema lichtgrijs,
+   wat witte tekst op een witte kaart oplevert. */
+
+.fr-app {
+    --fr-surface: #0f0f22;
+    --fr-surface-2: #13132b;
+    --fr-border: #1c1c35;
+    --fr-text: #e1e4f0;
+    --fr-dim: #8a90b0;
+    --fr-green: #3ecf6e;
+    --fr-amber: #f0c040;
+    --fr-red: #e05555;
+    --fr-blue: #4aa3ff;
+}
+
+.fr-app .card {
+    background: var(--fr-surface);
+    border: 1px solid var(--fr-border);
+}
+
+.fr-app .card-header {
+    background: var(--fr-surface-2);
+    border-bottom: 1px solid var(--fr-border);
+}
+
+/* ── Tegels ───────────────────────────────────────────────────────────────── */
+.fr-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: .75rem;
+    max-width: 48rem;
+}
+
+.fr-tile {
+    background: var(--fr-surface);
+    border: 1px solid var(--fr-border);
+    border-left: 4px solid var(--fr-dim);
+    border-radius: .4rem;
+    padding: .6rem .9rem;
+}
+
+.fr-tile-n {
+    font-size: 1.6rem;
+    font-weight: 600;
+    line-height: 1.1;
+}
+
+.fr-tile-l {
+    color: var(--fr-dim);
+    font-size: .8rem;
+}
+
+.fr-tile-accounts { border-left-color: var(--fr-blue);  background: linear-gradient(90deg, rgba(74,163,255,.12), transparent 62%); }
+.fr-tile-open     { border-left-color: var(--fr-amber); background: linear-gradient(90deg, rgba(240,192,64,.14), transparent 62%); }
+.fr-tile-klaar    { border-left-color: var(--fr-green); background: linear-gradient(90deg, rgba(62,207,110,.12), transparent 62%); }
+.fr-tile-done     { border-left-color: var(--fr-green); background: linear-gradient(90deg, rgba(62,207,110,.12), transparent 62%); }
+
+/* ── Knoppen en invoer ────────────────────────────────────────────────────── */
+.fr-btn {
+    background: var(--fr-surface-2);
+    border: 1px solid var(--fr-border);
+    color: var(--fr-text);
+}
+
+.fr-btn:hover {
+    background: var(--fr-border);
+    color: var(--fr-text);
+}
+
+.fr-input {
+    background: var(--fr-surface-2);
+    border: 1px solid var(--fr-border);
+    color: var(--fr-text);
+}
+
+.fr-input:focus {
+    background: var(--fr-surface-2);
+    border-color: var(--fr-dim);
+    color: var(--fr-text);
+    box-shadow: none;
+}
+
+.fr-input::placeholder { color: var(--fr-dim); }
+
+.fr-zoek {
+    display: inline-flex;
+    gap: .35rem;
+}
+
+.fr-zoek .fr-input { width: 16rem; }
+
+.fr-force {
+    display: inline-flex;
+    gap: .35rem;
+    justify-content: flex-end;
+}
+
+.fr-force .fr-input { width: 13rem; }
+
+.fr-corp { width: auto; max-width: 16rem; }
+
+/* Bulk-balk: één rij met redenveld en de twee knoppen. De vinkjes in de tabel
+   horen via form="fr-bulk" bij dit formulier, zodat de losse forceer-
+   formulieren per rij er niet in genest hoeven te zitten. */
+.fr-bulk {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .35rem .5rem;
+}
+
+.fr-bulk-reden { width: 16rem; }
+
+.fr-vink { width: 2rem; }
+
+.fr-vink .form-check-input {
+    background-color: var(--fr-surface-2);
+    border-color: var(--fr-dim);
+}
+
+/* ── Tabel ────────────────────────────────────────────────────────────────── */
+.fr-table th {
+    color: var(--fr-dim);
+    font-weight: 500;
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    border-bottom: 1px solid var(--fr-border);
+}
+
+.fr-table td { border-color: var(--fr-border); }
+
+.fr-row-open { background: rgba(240,192,64,.06); }
+
+.fr-nowrap { white-space: nowrap; }
+
+.fr-portrait {
+    width: 32px;
+    height: 32px;
+    border-radius: .3rem;
+}
+
+/* ── Badges ───────────────────────────────────────────────────────────────── */
+.fr-badge-open   { background: rgba(240,192,64,.18); color: var(--fr-amber); border: 1px solid rgba(240,192,64,.4); }
+.fr-badge-done   { background: rgba(62,207,110,.15); color: var(--fr-green); border: 1px solid rgba(62,207,110,.4); }
+.fr-badge-cancel { background: rgba(138,144,176,.15); color: var(--fr-dim);   border: 1px solid rgba(138,144,176,.4); }
+.fr-badge-admin  { background: rgba(74,163,255,.15);  color: var(--fr-blue);  border: 1px solid rgba(74,163,255,.4); font-weight: 500; vertical-align: middle; }
+.fr-badge-alts   { background: rgba(168,85,247,.15);  color: #c084fc;         border: 1px solid rgba(168,85,247,.4); }
+
+/* 'incl. alts'-vinkje naast de forceer-knoppen */
+.fr-alts-vlag {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    margin: 0;
+    font-size: .8rem;
+    color: var(--fr-dim);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.fr-alts-vlag .form-check-input {
+    margin: 0;
+    background-color: var(--fr-surface-2);
+    border-color: var(--fr-dim);
+}
+
+/* ── Alts-pagina (het lid zelf) ───────────────────────────────────────────── */
+.fr-alts-voortgang {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+
+.fr-progress {
+    flex: 1;
+    height: .6rem;
+    background: var(--fr-surface-2);
+}
+
+.fr-alt {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .4rem .6rem;
+    border: 1px solid var(--fr-border);
+    border-radius: .4rem;
+    margin-bottom: .35rem;
+    background: rgba(240,192,64,.05);
+}
+
+.fr-alt-klaar { background: rgba(62,207,110,.06); }
+
+.fr-alt-naam { flex: 1; }
+
+/* State: Guest oranje, Member groen, elke andere state neutraal. */
+.fr-state        { background: rgba(138,144,176,.15); color: var(--fr-text); border: 1px solid rgba(138,144,176,.4); font-weight: 500; }
+.fr-state-member { background: rgba(62,207,110,.15);  color: var(--fr-green); border-color: rgba(62,207,110,.4); }
+.fr-state-guest  { background: rgba(224,138,60,.15);  color: #e08a3c;         border-color: rgba(224,138,60,.4); }
+
+@media (max-width: 767px) {
+    .fr-force { flex-wrap: wrap; }
+    .fr-force .fr-input,
+    .fr-bulk-reden,
+    .fr-zoek .fr-input { width: 100%; }
+}
