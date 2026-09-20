@@ -19,6 +19,10 @@ Fase 2 (alleen met `include_alts`): elke alt van het account moet ook nog een
 keer door EVE SSO — AA controleert bij zo'n token opnieuw het eigendom. Tot
 dat klaar is (`alts_done_at`) houdt de middleware het lid op de alts-pagina.
 Welke alt al geweest is staat in `CharacterRelogin`.
+
+Optioneel gaan bij het forceren ook alle ESI-tokens van het account weg
+(`revoke_tokens`); dat regelt `tokens.revoke_esi_tokens`, waarna de Character
+Scan-aanmeldingen van dat account terug naar 'nieuw' gaan.
 """
 
 import logging
@@ -31,6 +35,8 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from allianceauth.authentication.models import CharacterOwnership
+
+from .tokens import reset_character_scan, revoke_esi_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +99,14 @@ class ReloginRequest(models.Model):
     include_alts = models.BooleanField(
         default=True, verbose_name=_("alts ook"),
         help_text=_("Ook elke alt van het account moet opnieuw door EVE SSO."),
+    )
+    revoke_tokens = models.BooleanField(
+        default=False, verbose_name=_("tokens ingetrokken"),
+        help_text=_("Alle ESI-tokens van het account zijn bij dit verzoek weggegooid."),
+    )
+    tokens_revoked = models.PositiveIntegerField(
+        default=0, verbose_name=_("aantal tokens"),
+        help_text=_("Hoeveel tokens er daadwerkelijk weg zijn gegooid."),
     )
     fulfilled_at = models.DateTimeField(null=True, blank=True, verbose_name=_("main ingelogd op"))
     alts_done_at = models.DateTimeField(null=True, blank=True, verbose_name=_("alts klaar op"))
@@ -230,36 +244,76 @@ def alts_map() -> dict:
     return _maps()["alts"]
 
 
-def force(user, by=None, reason: str = "", include_alts: bool = True):
+def _trek_tokens_in(verzoek) -> None:
+    """Gooit de ESI-tokens van het lid weg en noteert hoeveel het er waren.
+    Een mislukking mag het herlogin-verzoek zelf nooit tegenhouden.
+
+    `tokens_revoked` telt alles wat dit verzoek ooit heeft ingetrokken; wat
+    deze ronde wegging staat in het losse attribuut `zojuist_ingetrokken`,
+    zodat de melding aan de beheerder niet dubbeltelt. `scan_heropend` telt op
+    dezelfde manier de heropende Character Scan-aanmeldingen."""
+    verzoek.zojuist_ingetrokken = 0
+    verzoek.scan_heropend = 0
+    try:
+        aantal = revoke_esi_tokens(verzoek.user)
+    except Exception as fout:  # noqa: BLE001
+        logger.exception("ESI-tokens van %s niet kunnen intrekken: %s", verzoek.user, fout)
+        return
+    verzoek.zojuist_ingetrokken = aantal
+    verzoek.revoke_tokens = True
+    verzoek.tokens_revoked = (verzoek.tokens_revoked or 0) + aantal
+    verzoek.save(update_fields=["revoke_tokens", "tokens_revoked"])
+    try:
+        verzoek.scan_heropend = reset_character_scan(
+            verzoek.user, door=verzoek.requested_by, reden=verzoek.reason,
+        )
+    except Exception as fout:  # noqa: BLE001 — een andere plugin mag dit nooit breken
+        logger.exception("Character Scan van %s niet kunnen heropenen: %s", verzoek.user, fout)
+
+
+def force(user, by=None, reason: str = "", include_alts: bool = True, revoke_tokens: bool = False):
     """Zet een herlogin-verzoek klaar voor `user`.
 
     Staat er al een open verzoek, dan komt er geen tweede bij: de middleware
     kijkt toch alleen naar het jongste, en zo blijft de geschiedenis leesbaar.
+    Wie nu alsnog om het intrekken van de tokens vraagt, krijgt dat wel — het
+    open verzoek wordt dan bijgewerkt.
     Geeft (verzoek, nieuw_aangemaakt) terug.
     """
     bestaand = ReloginRequest.objects.pending().filter(user=user).order_by("-requested_at").first()
     if bestaand:
+        bestaand.zojuist_ingetrokken = 0
+        bestaand.scan_heropend = 0
+        if revoke_tokens:
+            _trek_tokens_in(bestaand)
         return bestaand, False
     verzoek = ReloginRequest.objects.create(
         user=user, requested_by=by, reason=(reason or "")[:200], include_alts=include_alts,
     )
-    logger.info("Herlogin geforceerd voor %s door %s (%s, alts=%s)", user, by, reason or "-", include_alts)
+    verzoek.zojuist_ingetrokken = 0
+    verzoek.scan_heropend = 0
+    if revoke_tokens:
+        _trek_tokens_in(verzoek)
+    logger.info(
+        "Herlogin geforceerd voor %s door %s (%s, alts=%s, tokens=%s)",
+        user, by, reason or "-", include_alts, revoke_tokens,
+    )
     return verzoek, True
 
 
-def fulfil(user, when=None) -> int:
+def fulfil(user, when=None) -> list:
     """Fase 1 afsluiten: de main is opnieuw ingelogd. Zonder alts (of zonder
-    `include_alts`) is het verzoek daarmee meteen helemaal klaar. Geeft het
-    aantal afgesloten verzoeken terug."""
+    `include_alts`) is het verzoek daarmee meteen helemaal klaar. Geeft de
+    afgesloten verzoeken terug."""
     nu = when or timezone.now()
-    n = 0
+    afgesloten = []
     for verzoek in ReloginRequest.objects.awaiting_login().filter(user=user):
         verzoek.fulfilled_at = nu
         if not verzoek.include_alts or not verzoek.required_alts().exists():
             verzoek.alts_done_at = nu
         verzoek.save(update_fields=["fulfilled_at", "alts_done_at"])
-        n += 1
-    return n
+        afgesloten.append(verzoek)
+    return afgesloten
 
 
 def cancel(user, by=None) -> int:

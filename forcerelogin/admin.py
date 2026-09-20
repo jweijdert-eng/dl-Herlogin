@@ -44,14 +44,17 @@ class CharacterReloginInline(admin.TabularInline):
 class ReloginRequestAdmin(admin.ModelAdmin):
     list_display = (
         "_lid", "status", "requested_at", "_door", "reason", "include_alts",
-        "fulfilled_at", "alts_done_at", "cancelled_at",
+        "revoke_tokens", "tokens_revoked", "fulfilled_at", "alts_done_at", "cancelled_at",
     )
-    list_filter = (StatusFilter, "include_alts")
+    list_filter = (StatusFilter, "include_alts", "revoke_tokens")
     search_fields = (
         "user__username", "user__profile__main_character__character_name",
         "requested_by__username", "reason",
     )
-    readonly_fields = ("requested_at", "fulfilled_at", "alts_done_at", "cancelled_at", "cancelled_by")
+    readonly_fields = (
+        "requested_at", "tokens_revoked", "fulfilled_at", "alts_done_at",
+        "cancelled_at", "cancelled_by",
+    )
     raw_id_fields = ("user", "requested_by")
     date_hierarchy = "requested_at"
     actions = ("intrekken",)

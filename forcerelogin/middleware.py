@@ -11,6 +11,9 @@ nooit onderbroken; anders zou een lid dat al bezig is met opnieuw inloggen
 halverwege teruggestuurd worden. Wie zelf Herlogin mag beheren houdt tijdens
 de alts-fase toegang tot het beheerscherm, zodat een beheerder die zichzelf
 geforceerd heeft het verzoek altijd nog kan intrekken.
+
+Zijn bij het verzoek ook de ESI-tokens ingetrokken, dan gaat het lid daarna
+nog één keer langs CharLink om z'n characters opnieuw te koppelen.
 """
 
 import logging
@@ -24,7 +27,8 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext as _
 
 from .models import ReloginRequest, alts_map, fulfil, pending_map
-from .signals import SESSION_KEY
+from .signals import RELINK_KEY, SESSION_KEY
+from .tokens import relink_url
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +65,10 @@ class ForceReloginMiddleware:
             return self._fase_login(request, user, sinds)
         if alts_verzoek is not None:
             return self._fase_alts(request, user, alts_verzoek, paden)
+        if request.session.get(RELINK_KEY):
+            antwoord = self._relink(request, paden)
+            if antwoord is not None:
+                return antwoord
         return self.get_response(request)
 
     def _fase_login(self, request, user, sinds):
@@ -101,6 +109,22 @@ class ForceReloginMiddleware:
             request.session[NEXT_KEY] = request.get_full_path()
         return redirect(paden["alts_pagina"])
 
+    def _relink(self, request, paden):
+        """Eén keer naar CharLink sturen nadat de tokens zijn ingetrokken: de
+        herlogin zelf geeft alleen `publicData` terug, de apps moeten opnieuw
+        gekoppeld worden. Alleen bij echte paginanavigatie, en de vlag gaat er
+        hoe dan ook af — het is een duwtje, geen gijzeling."""
+        if request.method != "GET" or "text/html" not in request.headers.get("Accept", ""):
+            return None
+        doel = paden["relink"]
+        request.session.pop(RELINK_KEY, None)
+        if not doel or request.path.startswith(doel):
+            return None
+        messages.info(request, _(
+            "Je ESI-tokens zijn ingetrokken. Koppel je characters hier opnieuw."
+        ))
+        return redirect(doel)
+
     def _resolve(self) -> dict:
         if self._paden is None:
             login_vrij, prefix = set(), ()
@@ -125,5 +149,6 @@ class ForceReloginMiddleware:
                 "alts_pagina": alts_pagina,
                 "alts_vrij": {alts_pagina, reverse("forcerelogin:alt_login")},
                 "beheer_prefix": reverse("forcerelogin:index"),
+                "relink": relink_url(),
             }
         return self._paden

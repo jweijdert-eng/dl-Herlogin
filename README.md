@@ -29,8 +29,43 @@ eigendom van het main character).
   is de manier om een heel account (main én alts) te laten herbevestigen. De
   lijst toont de voortgang als *alts 2/6*. Zonder het vinkje is de main-login
   genoeg — handig voor een snelle sessie-reset.
+* Met 🔑 **tokens intrekken** (standaard **uit**) gaan bij het forceren ook alle
+  ESI-tokens van het account weg — zie hieronder.
 * De **geschiedenis** (wie, wanneer, waarom, status) staat onderaan de pagina en
   in het admin-paneel (met een filter op status en een bulk-actie *intrekken*).
+
+## ESI-tokens intrekken
+
+Het vinkje 🔑 **tokens intrekken** gooit bij het forceren alle ESI-tokens van
+het account weg: main én alts, van álle apps. Het staat standaard uit en vraagt
+een bevestiging, want het lid kan dit zelf niet terugdraaien.
+
+* **Wat er stilvalt:** Member Audit, CorpTools, Character Scan en alles wat
+  verder ESI gebruikt, tot het lid z'n characters opnieuw koppelt. Heeft het
+  lid een corp-token (director), dan valt de corp-brede audit dus ook stil.
+* **Wat blijft staan:** het account zelf. De `CharacterOwnership`, het main
+  character, de state en de groepen blijven ongemoeid — AA ruimt bij het
+  weggooien van het laatste token normaal het eigendom op, en daarmee de main
+  en de state (lid zakt naar Guest en vliegt uit Discord). Dat gedrag wordt
+  tijdens het wissen tegengehouden, met een herstelstap als vangnet.
+* **Opnieuw koppelen gaat via CharLink**, niet via deze plugin: de herlogin
+  vraagt alleen `publicData`. Daarom belandt het lid na de herlogin (en na de
+  alts-stap) één keer op CharLink, met een melding erbij. Eén duwtje, geen
+  gijzeling — de volgende pagina komt gewoon door.
+* Staat **Character Scan** (`aa-characterscan`) ernaast, dan gaan de
+  aanmeldingen van dat account terug naar **Nieuw**: met ingetrokken toegang
+  hoort een recruiter er opnieuw naar te kijken in plaats van op een oordeel
+  van maanden geleden te leunen. De aanmelding en haar logboek blijven staan;
+  er komt een regel *Heropend* bij met de reden erin. Is de plugin niet
+  geinstalleerd, dan gebeurt er niets — Herlogin hangt er niet van af.
+* Er komt niemand *nieuw* in de Character Scan te staan: alleen bestaande
+  aanmeldingen gaan terug naar Nieuw. Een lid kan zichzelf wel aanmelden door
+  bij het opnieuw koppelen in CharLink het vinkje *Character Scan* aan te
+  zetten.
+* Er gaat geen revoke-call naar CCP: een refresh token is alleen bruikbaar met
+  de client-secret van jouw installatie, dus de rij hier weggooien ís het
+  intrekken.
+* De lijst en de geschiedenis tonen 🔑 met het aantal ingetrokken tokens.
 
 ## Bulk en hele corp
 
@@ -47,7 +82,11 @@ eigendom van het main character).
   met de gewone knop.
 * Wie al een open verzoek heeft wordt niet nog eens aangemaakt; de melding
   achteraf zegt hoeveel leden geraakt zijn, hoeveel al open stonden en hoeveel
-  admins overgeslagen zijn.
+  admins overgeslagen zijn. Staat 🔑 aan, dan worden de tokens van zo'n open
+  verzoek alsnog ingetrokken en telt de melding ze mee.
+* Het vinkje 🔑 **tokens intrekken** geldt ook voor bulk. Een hele corp
+  tegelijk betekent dat al die leden opnieuw moeten koppelen in CharLink —
+  bevestig die vraag dus bewust.
 
 Sessies die al bestonden vóór de plugin geïnstalleerd werd hebben geen
 inlogstempel en gelden als "oud": een verzoek voor zo'n account werkt dus ook
@@ -88,9 +127,9 @@ sessie gooien.
 
 ## Wat het niet doet
 
-* Bestaande **ESI-tokens** blijven staan; alleen de Auth-sessie vervalt. De
-  alts-stap vraagt alleen `publicData` (net als de login) en vervangt geen
-  tokens van andere apps.
+* Zonder het vinkje 🔑 blijven bestaande **ESI-tokens** staan; alleen de
+  Auth-sessie vervalt. De alts-stap vraagt alleen `publicData` (net als de
+  login) en vervangt geen tokens van andere apps.
 * Het lid wordt niet uitgelogd bij EVE zelf. Is het lid daar nog ingelogd, dan is de
   SSO-flow één klik — het gaat erom dat AA de login opnieuw verwerkt.
 * Kan een lid een alt niet meer inloggen (character verkocht of gebiomassed,

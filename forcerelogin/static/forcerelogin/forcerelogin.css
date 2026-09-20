@@ -93,6 +93,8 @@
 
 .fr-force {
     display: inline-flex;
+    flex-wrap: wrap;   /* anders valt het tokens-vinkje buiten de smalle actie-kolom */
+    align-items: center;
     gap: .35rem;
     justify-content: flex-end;
 }
@@ -148,6 +150,7 @@
 .fr-badge-cancel { background: rgba(138,144,176,.15); color: var(--fr-dim);   border: 1px solid rgba(138,144,176,.4); }
 .fr-badge-admin  { background: rgba(74,163,255,.15);  color: var(--fr-blue);  border: 1px solid rgba(74,163,255,.4); font-weight: 500; vertical-align: middle; }
 .fr-badge-alts   { background: rgba(168,85,247,.15);  color: #c084fc;         border: 1px solid rgba(168,85,247,.4); }
+.fr-badge-tokens { background: rgba(224,85,85,.15);   color: var(--fr-red);   border: 1px solid rgba(224,85,85,.4); }
 
 /* 'incl. alts'-vinkje naast de forceer-knoppen */
 .fr-alts-vlag {
@@ -166,6 +169,11 @@
     background-color: var(--fr-surface-2);
     border-color: var(--fr-dim);
 }
+
+/* Het tokens-vinkje is de gevaarlijke: rood, zodat het opvalt naast 'alts'. */
+.fr-tokens-vlag { color: var(--fr-red); }
+.fr-tokens-vlag .form-check-input { border-color: var(--fr-red); }
+.fr-tokens-vlag .form-check-input:checked { background-color: var(--fr-red); border-color: var(--fr-red); }
 
 /* ── Alts-pagina (het lid zelf) ───────────────────────────────────────────── */
 .fr-alts-voortgang {

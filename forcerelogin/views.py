@@ -23,6 +23,7 @@ from esi.models import Token
 from . import __version__
 from .middleware import NEXT_KEY
 from .models import ReloginRequest, cancel, force
+from .tokens import relink_url
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -140,6 +141,19 @@ def _alts_vlag(request) -> bool:
     return request.POST.get("alts") == "1"
 
 
+def _tokens_vlag(request) -> bool:
+    """Checkbox 'tokens intrekken': staat standaard úít — het lid moet daarna
+    al z'n characters opnieuw koppelen in CharLink."""
+    return request.POST.get("tokens") == "1"
+
+
+def _scan_melding(n: int) -> str:
+    """Character Scan is optioneel; alleen iets zeggen als er echt iets veranderd is."""
+    if not n:
+        return ""
+    return " " + _("%(n)d Character Scan-aanmelding(en) terug naar Nieuw.") % {"n": n}
+
+
 def _naam(user) -> str:
     try:
         main = user.profile.main_character
@@ -202,14 +216,23 @@ def force_user(request, user_id: int):
     reason = request.POST.get("reason", "").strip()[:200]
 
     alts = _alts_vlag(request)
-    verzoek, nieuw = force(target, by=request.user, reason=reason, include_alts=alts)
+    tokens = _tokens_vlag(request)
+    verzoek, nieuw = force(target, by=request.user, reason=reason, include_alts=alts, revoke_tokens=tokens)
     naam = _naam(target)
     if not nieuw:
-        messages.info(request, _("%(naam)s moest al opnieuw inloggen; verzoek stond al open.") % {"naam": naam})
+        melding = _("%(naam)s moest al opnieuw inloggen; verzoek stond al open.") % {"naam": naam}
+        if tokens:
+            melding += " " + _("De ESI-tokens zijn alsnog ingetrokken (%(n)d).") % {"n": verzoek.zojuist_ingetrokken}
+            melding += _scan_melding(verzoek.scan_heropend)
+        messages.info(request, melding)
         return _terug(request)
 
-    _notify(target, reason, alts)
-    messages.success(request, _("%(naam)s wordt bij het eerstvolgende bezoek uitgelogd en moet opnieuw inloggen.") % {"naam": naam})
+    _notify(target, reason, alts, tokens)
+    melding = _("%(naam)s wordt bij het eerstvolgende bezoek uitgelogd en moet opnieuw inloggen.") % {"naam": naam}
+    if tokens:
+        melding += " " + _("%(n)d ESI-token(s) ingetrokken.") % {"n": verzoek.zojuist_ingetrokken}
+        melding += _scan_melding(verzoek.scan_heropend)
+    messages.success(request, melding)
     return _terug(request)
 
 
@@ -227,10 +250,15 @@ def cancel_user(request, user_id: int):
     return _terug(request)
 
 
-def _notify(target, reason: str, alts: bool) -> None:
+def _notify(target, reason: str, alts: bool, tokens: bool = False) -> None:
     tekst = _("Een beheerder heeft je gevraagd opnieuw in te loggen op Auth.")
     if alts:
         tekst += " " + _("Daarna moet je ook al je alts één keer via EVE SSO inloggen.")
+    if tokens:
+        tekst += " " + _(
+            "Je ESI-tokens zijn ingetrokken: koppel daarna al je characters opnieuw in CharLink, "
+            "anders staan Member Audit en de andere apps stil."
+        )
     if reason:
         tekst += " " + _("Reden: %(reden)s") % {"reden": reason}
     try:
@@ -249,6 +277,7 @@ def force_bulk(request):
     mode = request.POST.get("mode", "")
     reason = request.POST.get("reason", "").strip()[:200]
     alts = _alts_vlag(request)
+    tokens = _tokens_vlag(request)
 
     if mode == "selected":
         ids = {int(x) for x in request.POST.getlist("user_id") if x.isdigit()}
@@ -270,19 +299,26 @@ def force_bulk(request):
     admins = admin_ids() | {request.user.pk}
     doelen = User.objects.filter(pk__in=ids, is_active=True, profile__main_character__isnull=False)
 
-    nieuw, al_open, overgeslagen = 0, 0, 0
+    nieuw, al_open, overgeslagen, weg, heropend = 0, 0, 0, 0, 0
     for target in doelen:
         if target.pk in admins:
             overgeslagen += 1
             continue
-        _verzoek, created = force(target, by=request.user, reason=reason, include_alts=alts)
+        verzoek, created = force(target, by=request.user, reason=reason, include_alts=alts, revoke_tokens=tokens)
         if created:
             nieuw += 1
-            _notify(target, reason, alts)
+            _notify(target, reason, alts, tokens)
         else:
             al_open += 1
+        if tokens:
+            weg += verzoek.zojuist_ingetrokken
+            heropend += verzoek.scan_heropend
 
     delen = [_("%(n)d lid/leden moeten opnieuw inloggen.") % {"n": nieuw}]
+    if tokens:
+        delen.append(_("%(n)d ESI-token(s) ingetrokken.") % {"n": weg})
+        if heropend:
+            delen.append(_("%(n)d Character Scan-aanmelding(en) terug naar Nieuw.") % {"n": heropend})
     if al_open:
         delen.append(_("%(n)d stond(en) al open.") % {"n": al_open})
     if overgeslagen:
@@ -291,19 +327,34 @@ def force_bulk(request):
     return _terug(request)
 
 
+def _klaar_redirect(request, verzoek=None):
+    """Waar het lid heen mag als alles klaar is: terug naar waar het heen
+    wilde, maar met ingetrokken tokens eerst langs CharLink — de herlogin
+    geeft alleen `publicData` terug, de apps moeten opnieuw gekoppeld."""
+    volgende = request.session.pop(NEXT_KEY, None)
+    if verzoek is not None and verzoek.revoke_tokens:
+        doel = relink_url()
+        if doel:
+            messages.info(request, _(
+                "Je ESI-tokens zijn ingetrokken. Koppel je characters hier opnieuw."
+            ))
+            return redirect(doel)
+    return redirect(volgende or "authentication:dashboard")
+
+
 @login_required
 def alts(request):
     """Waar het lid tijdens fase 2 op wordt vastgehouden: welke alts nog moeten."""
     verzoek = ReloginRequest.objects.awaiting_alts().filter(user=request.user).order_by("-requested_at").first()
     if verzoek is None:
         messages.info(request, _("Je hoeft geen alts opnieuw in te loggen."))
-        return redirect(request.session.pop(NEXT_KEY, None) or "authentication:dashboard")
+        return _klaar_redirect(request)
 
     klaar, totaal, rijen = verzoek.alts_progress()
     if totaal - klaar == 0:
         verzoek.close_alts()
         messages.success(request, _("Al je alts zijn opnieuw ingelogd. Bedankt!"))
-        return redirect(request.session.pop(NEXT_KEY, None) or "authentication:dashboard")
+        return _klaar_redirect(request, verzoek)
 
     try:
         main = request.user.profile.main_character
@@ -352,7 +403,7 @@ def verwerk_alt_token(request, token):
         messages.success(request, _("%(naam)s ingelogd — al je alts zijn nu geweest. Bedankt!") % {
             "naam": eigen.character.character_name,
         })
-        return redirect(request.session.pop(NEXT_KEY, None) or "authentication:dashboard")
+        return _klaar_redirect(request, verzoek)
 
     messages.success(request, _("%(naam)s ingelogd, nog %(n)d te gaan.") % {
         "naam": eigen.character.character_name, "n": verzoek.open_alts(),

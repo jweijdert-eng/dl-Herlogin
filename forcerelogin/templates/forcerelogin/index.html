@@ -71,12 +71,15 @@
             <label class="fr-alts-vlag" title="{% translate 'Ook elke alt moet daarna één keer via EVE SSO' %}">
                 <input type="checkbox" class="form-check-input" name="alts" value="1" checked> {% translate "incl. alts" %}
             </label>
+            <label class="fr-alts-vlag fr-tokens-vlag" title="{% translate 'Gooit alle ESI-tokens van het account weg en zet de aanmeldingen in Character Scan terug op Nieuw. Member Audit en CorpTools staan stil tot het lid alles opnieuw koppelt in CharLink. Zet ook de vinkjes in de rijen om.' %}">
+                <input type="checkbox" class="form-check-input" name="tokens" value="1" onchange="frTokensAll(this)"> 🔑 {% translate "tokens intrekken" %}
+            </label>
             <button type="submit" name="mode" value="selected" class="btn btn-sm btn-warning fr-nowrap"
-                    onclick="return document.querySelectorAll('input[name=user_id]:checked').length > 0 || (alert('{% translate "Vink eerst leden aan." %}'), false)">
+                    onclick="return (document.querySelectorAll('input[name=user_id]:checked').length > 0 || (alert('{% translate "Vink eerst leden aan." %}'), false)) && frTokens(this.form)">
                 ☑ {% translate "Forceer geselecteerde" %}
             </button>
             <button type="submit" name="mode" value="shown" class="btn btn-sm btn-outline-danger fr-nowrap" {% if not n_forceable %}disabled{% endif %}
-                    onclick="return confirm('{% if corp_name %}{% translate "Hele corp" %} {{ corp_name|escapejs }}{% else %}{% translate "Alle getoonde accounts" %}{% endif %} ({{ n_forceable }}) {% translate "opnieuw laten inloggen?" %}')">
+                    onclick="return confirm('{% if corp_name %}{% translate "Hele corp" %} {{ corp_name|escapejs }}{% else %}{% translate "Alle getoonde accounts" %}{% endif %} ({{ n_forceable }}) {% translate "opnieuw laten inloggen?" %}') && frTokens(this.form)">
                 {% if corp_name %}⚠ {% translate "Forceer hele corp" %} {{ corp_name }} ({{ n_forceable }}){% else %}⚠ {% translate "Forceer alle getoonde" %} ({{ n_forceable }}){% endif %}
             </button>
             <span class="small text-muted">{% translate "admins en open verzoeken worden overgeslagen" %}</span>
@@ -141,6 +144,7 @@
                                             <span class="badge fr-badge-open">⏳ {% translate "wacht" %}</span>
                                             {% if r.pending.include_alts %}<span class="badge fr-badge-alts">+ {% translate "alts" %}</span>{% endif %}
                                         {% endif %}
+                                        {% if r.pending.revoke_tokens %}<span class="badge fr-badge-tokens" title="{% translate 'ESI-tokens ingetrokken; moet opnieuw koppelen in CharLink' %}">🔑 {{ r.pending.tokens_revoked }}</span>{% endif %}
                                         <div class="small text-muted">
                                             {{ r.pending.requested_at|timesince }} {% translate "geleden" %}
                                             {% if r.pending.requested_by %}· {{ r.pending.requested_by.profile.main_character.character_name|default:r.pending.requested_by.username }}{% endif %}
@@ -166,7 +170,11 @@
                                             <label class="fr-alts-vlag" title="{% translate 'Ook elke alt moet daarna één keer via EVE SSO' %}">
                                                 <input type="checkbox" class="form-check-input" name="alts" value="1" checked> {% translate "alts" %}
                                             </label>
-                                            <button type="submit" class="btn btn-sm btn-warning fr-nowrap">{% translate "Forceer herlogin" %}</button>
+                                            <label class="fr-alts-vlag fr-tokens-vlag" title="{% translate 'Gooit alle ESI-tokens van het account weg en zet de aanmeldingen in Character Scan terug op Nieuw. Member Audit en CorpTools staan stil tot het lid alles opnieuw koppelt in CharLink.' %}">
+                                                <input type="checkbox" class="form-check-input" name="tokens" value="1"> 🔑 {% translate "tokens" %}
+                                            </label>
+                                            <button type="submit" class="btn btn-sm btn-warning fr-nowrap"
+                                                    onclick="return frTokens(this.form)">{% translate "Forceer herlogin" %}</button>
                                         </form>
                                     {% endif %}
                                 </td>
@@ -218,6 +226,7 @@
                                         <span class="badge fr-badge-cancel">✕ {% translate "ingetrokken" %}</span>
                                         <span class="small text-muted">{{ h.cancelled_at|date:"d-m-Y H:i" }}{% if h.cancelled_by %} · {{ h.cancelled_by.profile.main_character.character_name|default:h.cancelled_by.username }}{% endif %}</span>
                                     {% endif %}
+                                    {% if h.revoke_tokens %}<span class="badge fr-badge-tokens" title="{% translate 'ESI-tokens ingetrokken' %}">🔑 {{ h.tokens_revoked }}</span>{% endif %}
                                 </td>
                             </tr>
                         {% endfor %}
@@ -226,4 +235,22 @@
             </div>
         {% endif %}
     </div>
+
+    <script>
+        // Het vinkje in de bulk-balk geldt alleen voor de bulk-knoppen. Wie het
+        // daar aanzet en daarna een losse rij forceert verwacht hetzelfde, dus
+        // zetten we de vinkjes in de rijen mee om — zichtbaar, niet stiekem.
+        function frTokensAll(bron) {
+            document.querySelectorAll('form.fr-force input[name=tokens]').forEach(function (vlag) {
+                vlag.checked = bron.checked;
+            });
+        }
+
+        // Tokens weggooien kan het lid zelf niet terugdraaien: eerst bevestigen.
+        function frTokens(form) {
+            var vlag = form.querySelector('input[name=tokens]');
+            if (!vlag || !vlag.checked) { return true; }
+            return confirm('{% translate "Ook alle ESI-tokens weggooien? Aanmeldingen in Character Scan gaan terug naar Nieuw en de apps staan stil tot het lid alles opnieuw koppelt in CharLink." %}');
+        }
+    </script>
 {% endblock %}

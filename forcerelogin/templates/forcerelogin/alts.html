@@ -20,6 +20,12 @@
                         {% translate "Klik op de knop en kies op de EVE-pagina telkens een alt die hieronder nog open staat. Tot alles geweest is kun je Auth verder niet gebruiken." %}
                     </p>
 
+                    {% if verzoek.revoke_tokens %}
+                        <div class="alert alert-warning py-2 small mb-3">
+                            🔑 {% translate "Je ESI-tokens zijn ingetrokken. Zodra je alts geweest zijn kom je op CharLink uit; koppel daar al je characters opnieuw, anders staan Member Audit en de andere apps stil." %}
+                        </div>
+                    {% endif %}
+
                     <div class="fr-alts-voortgang mb-3">
                         <div class="progress fr-progress" role="progressbar" aria-valuenow="{{ klaar }}" aria-valuemin="0" aria-valuemax="{{ totaal }}">
                             <div class="progress-bar bg-success" style="width: {% widthratio klaar totaal 100 %}%"></div>
